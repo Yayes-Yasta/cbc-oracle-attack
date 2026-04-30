@@ -185,3 +185,78 @@ In our case, CBC mode is used which means that the plaintext of each block is fi
 
 client.py serves as our oracle which means that we can give it some plaintext and it gives us back the corresponding ciphertext. Without an oracle, this attack is not possible. What we can do is choose our inputs in such a way that the first byte of `cookie` is placed at the last byte of a block. We then record the ciphertext of that block. Next, we give the same plaintext to the oracle with the only difference being that the final byte of that block is now filled with any byte we desire. If the produced ciphertext is the same as the recorded ciphertext, we know that this block and therefore we found one byte belonging to `cookie`. If the ciphertexts do not match, we simply try again until we find a match. We then repeat this with the next byte and find `cookie` byte to byte.  
 This attack is automated in exploit.py:
+```python
+from pwn import *
+import hashlib
+
+
+BLOCK_SIZE = 16
+CIPHER_TEXT_START = 24
+
+# we compare the 4th block
+BLOCK_START = CIPHER_TEXT_START + 3 * 2 * BLOCK_SIZE
+BLOCK_END = CIPHER_TEXT_START + 4 * 2 * BLOCK_SIZE
+# multiplied by 2 because the ciphertexts are double the size of the plaintexts
+
+characters = '0123456789abcdefghijklmnopqrstuvwxyz_-'
+
+cookie = ''
+
+i = 0
+while True:
+    p = remote('127.0.0.1', 9006)
+
+    id_ = b'0'
+    pw = b'-' * (BLOCK_SIZE * 4 - 4 - i)
+    # plaintext will be <id_>-<pw>-<cookie>
+
+    p.recvuntil(b'ID\n')
+    p.sendline(id_)
+    p.recvline()
+    p.sendline(pw)
+
+    line = p.recvline()
+  
+    target_block = line[BLOCK_START:BLOCK_END]
+
+    p.close()
+
+    found = False
+    for character in characters:
+        p = remote('127.0.0.1', 9006)
+
+        id_ = b'0'
+        pw = b'-' * (BLOCK_SIZE * 4 - 3 -i)
+        pw += cookie.encode() + character.encode()
+        # plaintext will be <id_>-<pw>-<cookie>
+
+        p.recvuntil(b'ID\n')
+        p.sendline(id_)
+        p.recvline()    
+        p.sendline(pw)
+    
+        line = p.recvline()
+        block = line[BLOCK_START:BLOCK_END]
+
+        p.close()
+        
+        if block == target_block:
+            cookie += character
+            found = True
+            break
+
+    if not found: break
+    
+    i += 1
+    print(cookie)
+
+guest_pw = hashlib.sha256(('guest' + cookie).encode()).hexdigest() 
+admin_pw = hashlib.sha256(('admin' + cookie).encode()).hexdigest() 
+
+print(f'cookie: {cookie}')
+print('\nCredentials:')
+print(f'guest:{guest_pw}')
+print(f'admin:{admin_pw}')
+```
+
+
