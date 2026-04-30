@@ -159,7 +159,7 @@ def request_auth(id, pw):
 ```
 
 Here we can see that the string to be encrypted is structured like this: `<id>-<pw>-<cookie>` where we have full control over `id` and `pw` but `cookie` is unknown.
-This is then encrypted and sent to server.py. Interestingly, the encypted data is also printed. This should be good news. The ciphertext which includes `cookie` is leaked. So we have a partially controlled plaintext and we can always find out the corresponding ciphertext. Is there any way to find the unknown part of the plaintext under these circumstances? Well, let's take a look at the AES implementation to answer that.
+This is then encrypted and sent to server.py. Interestingly, the encrypted data is also printed. This should be good news. The ciphertext which includes `cookie` is leaked. So we have a partially controlled plaintext and we can always find out the corresponding ciphertext. Is there any way to find the unknown part of the plaintext under these circumstances? Well, let's take a look at the AES implementation to answer that.
 
 ### The AES implementation
 
@@ -179,7 +179,7 @@ The AES implementation is using CBC mode and reuses the same IV which opens a po
 ### Block cipher modes
 
 AES is a block cipher which means that the plaintext is split into blocks of a set block size. The mode of operation then determines how these blocks are encrypted. For example in ECB mode, all blocks are encrypted independently using the same key.  
-In our case, CBC mode is used which means that the plaintext of each block is first XORed with the ciphertext of the previous block and then encrypted. The very first block does not have a previous block, so it uses an IV (Initialization vector) instead. This IV does not have to be secret but it should be randomized so that the same plaintext can result in different ciphertexts. In our case, the IV is hard coded though, so the ciphertext of every block depends only on the previous blocks. This is a potential attack vector.
+In our case, CBC mode is used which means that the plaintext of each block is first XORed with the ciphertext of the previous block and then encrypted. The very first block does not have a previous block, so it uses an IV (Initialization vector) instead. This IV does not have to be secret but it should be randomized so that the same plaintext results in different ciphertexts to be unpredictable. In our case, the IV is hard coded though, so the ciphertext of every block depends only on the previous blocks. This is a potential attack vector.
 
 ### The attack
 
