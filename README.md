@@ -159,7 +159,7 @@ def request_auth(id, pw):
 ```
 
 Here we can see that the string to be encrypted is structured like this: `<id>-<pw>-<cookie>` where we have full control over `id` and `pw` but `cookie` is unknown.
-This is then encrypted and sent to server.py. Intererestingly, the encypted data is also printed. This should be good news. The ciphertext which includes `cookie` is leaked. So we have a partially controlled plaintext and we can always find out the corresponding ciphertext. Is there any way to find the unknown part of the plaintext under these circumstances? Well, let's take a look at the AES implementation to answer that.
+This is then encrypted and sent to server.py. Interestingly, the encypted data is also printed. This should be good news. The ciphertext which includes `cookie` is leaked. So we have a partially controlled plaintext and we can always find out the corresponding ciphertext. Is there any way to find the unknown part of the plaintext under these circumstances? Well, let's take a look at the AES implementation to answer that.
 
 ### The AES implementation
 
@@ -173,13 +173,13 @@ cookie = 'erased'
 cipher = AES.new(key, AES.MODE_CBC, iv)
 ```
 
-We can see that the key is redacted. We do know the iv which is basically another input parameter but that doesn't really matter because it is deemed cryptographically infeasible to break AES without knowing the key. This means that we have no way of finding the plaintext, even if the program is leaking the ciphertext, right? WRONG!
-The AES implementation is using CBC mode which opens a potential attack vector. 
+We can see that the key is redacted. We do know the IV which is basically another input parameter but that doesn't really matter because it is deemed cryptographically infeasible to break AES without knowing the key. This means that we have no way of finding the plaintext, even if the program is leaking the ciphertext, right? WRONG!
+The AES implementation is using CBC mode and reuses the same IV which opens a potential attack vector. 
 
 ### Block cipher modes
 
 AES is a block cipher which means that the plaintext is split into blocks of a set block size. The mode of operation then determines how these blocks are encrypted. For example in ECB mode, all blocks are encrypted independently using the same key.  
-In our case, CBC mode is used which means that the plaintext of each block is first XORed with the ciphertext of the previous block and then encrypted. So the ciphertext of every block depends only on the previous blocks.
+In our case, CBC mode is used which means that the plaintext of each block is first XORed with the ciphertext of the previous block and then encrypted. The very first block does not have a previous block, so it uses an IV (Initialization vector) instead. This IV does not have to be secret but it should be randomized so that the same plaintext can result in different ciphertexts. In our case, the IV is hard coded though, so the ciphertext of every block depends only on the previous blocks. This is a potential attack vector.
 
 ### The attack
 
@@ -197,6 +197,7 @@ CIPHER_TEXT_START = 24
 BLOCK_START = CIPHER_TEXT_START + 3 * 2 * BLOCK_SIZE
 BLOCK_END = CIPHER_TEXT_START + 4 * 2 * BLOCK_SIZE
 # multiplied by 2 because the ciphertexts are double the size of the plaintexts
+# because of hex encoding
 
 characters = '0123456789abcdefghijklmnopqrstuvwxyz_-'
 
